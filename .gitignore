@@ -1,3 +1,4 @@
 /target
 /Cargo.lock
-/test_images/
+/src_images/*
+/dst_images/*
