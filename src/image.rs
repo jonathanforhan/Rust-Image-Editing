@@ -35,7 +35,7 @@ impl Image {
         let min = color.clone().into_iter().min().unwrap();
         let color = color.into_iter().map(|x| x - min).collect::<Color>();
 
-        self.data = color_shift_threaded(&color, &self.data).unwrap();
+        self.data = color_shift_threaded(&color, &self.data, 8).unwrap();
 
         Ok(())
     }
