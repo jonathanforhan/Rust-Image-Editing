@@ -4,30 +4,33 @@ mod image_log;
 use image_log::image_log;
 mod image_utils;
 pub use image_utils::Color;
+mod color_shift;
+use color_shift::color_shift_threaded;
 
 use std::{
     fs::File,
     io::{Read, Write},
     error::Error,
+	sync::{Arc, RwLock},
 };
 
-use self::image_utils::color_shift_threaded;
+type DataRef = Arc<RwLock<Vec<u8>>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Image {
     header: ImageHeader,
-    data: Vec<u8>,
+    data: DataRef,
 }
 
 impl Image {
     pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
         let mut file = File::open(path).expect("Unable to open file");
         let image_header = ImageHeader::new(&file).expect("Header generation failed");
-        let mut data: Vec<u8> = Vec::new();
+        let data: DataRef = Arc::new(RwLock::new(Vec::new()));
 
-        file.read_to_end(&mut data).expect("Unable to read file");
+        file.read_to_end(&mut data.write().unwrap()).expect("Unable to read file");
 
-        image_log(&image_header, &data);
+        //image_log(&image_header, data.read().unwrap().len());
         Ok(Image { header: image_header.clone(), data })
     }
 
@@ -35,7 +38,7 @@ impl Image {
         let min = color.clone().into_iter().min().unwrap();
         let color = color.into_iter().map(|x| x - min).collect::<Color>();
 
-        self.data = color_shift_threaded(&color, &self.data, 8).unwrap();
+        color_shift_threaded(&color, Arc::clone(&self.data), 4).unwrap();
 
         Ok(())
     }
@@ -55,14 +58,10 @@ impl Image {
 
     pub fn write_file(&self, file_name: &str) -> std::io::Result<()> {
         let mut file = File::create(file_name.to_string() + ".ppm")?;
-    
-        let header = self.header.format.clone() + "\n" +
-                     &self.header.width.to_string() + " " +
-                     &self.header.height.to_string() + "\n" +
-                     &self.header.encoding.to_string() + "\n";
+        let header = self.header.fmt()?;
 
         file.write(header.as_bytes())?;
-        file.write(&self.data)?;
+        file.write(&self.data.read().unwrap())?;
 
         Ok(())
     }

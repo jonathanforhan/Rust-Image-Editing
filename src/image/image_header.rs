@@ -49,5 +49,14 @@ impl ImageHeader {
         file.seek(std::io::SeekFrom::Start(header_size as u64))?; // reset position after use
         Ok(image_header)
     }
+
+    pub fn fmt(&self) -> std::io::Result<String> {
+        let header = self.format.clone() + "\n" +
+                     &self.width.to_string() + " " +
+                     &self.height.to_string() + "\n" +
+                     &self.encoding.to_string() + "\n";
+        Ok(header)
+
+    }
 }
 
