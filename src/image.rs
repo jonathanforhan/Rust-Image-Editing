@@ -1,67 +1,73 @@
-mod image_header;
-use image_header::ImageHeader;
-mod image_log;
-use image_log::image_log;
-mod image_utils;
-pub use image_utils::Color;
-mod color_shift;
-use color_shift::color_shift_threaded;
+mod ppm;
+mod qoi;
+mod utils;
+pub use utils::{ImgFormat, Color, Header};
+use crate::image::qoi::qoi_to_ppm;
 
 use std::{
     fs::File,
     io::{Read, Write},
     error::Error,
-	sync::{Arc, RwLock},
+    fmt::Debug,
 };
 
-type DataRef = Arc<RwLock<Vec<u8>>>;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Image {
-    header: ImageHeader,
-    data: DataRef,
+    header: Header,
+    data: Vec<u8>,
+    format: ImgFormat,
 }
 
 impl Image {
-    pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
-        let mut file = File::open(path).expect("Unable to open file");
-        let image_header = ImageHeader::new(&file).expect("Header generation failed");
-        let data: DataRef = Arc::new(RwLock::new(Vec::new()));
+    pub fn new(format: ImgFormat, path: &str) -> Result<Self, Box<dyn Error>> {
+        let mut file = File::open(path)?;
+        let mut header = Header::from(&format, &file)?;
+        let mut data: Vec<u8> = Vec::new();
 
-        file.read_to_end(&mut data.write().unwrap()).expect("Unable to read file");
+        file.read_to_end(&mut data)?;
 
-        //image_log(&image_header, data.read().unwrap().len());
-        Ok(Image { header: image_header.clone(), data })
+        match format {
+            ImgFormat::Ppm => (),
+            ImgFormat::Qoi => { qoi_to_ppm(&mut header, &mut data)?; () },
+            ImgFormat::Png => { return Err(Box::<dyn Error>::from("Unsupported format")); },
+            ImgFormat::Jpg => { return Err(Box::<dyn Error>::from("Unsupported format")); },
+        }
+
+        Ok(Image { header, data, format })
     }
 
-    pub fn color_shift(&mut self, color: Color) -> std::io::Result<()> {
+    pub fn color_shift(&mut self, color: (u8, u8, u8)) -> Result<&mut Self, Box<dyn Error>> {
+        let color = Color::new(color.0, color.1, color.2);
         let min = color.clone().into_iter().min().unwrap();
         let color = color.into_iter().map(|x| x - min).collect::<Color>();
 
-        color_shift_threaded(&color, Arc::clone(&self.data), 4).unwrap();
+        let c = [color.r, color.g, color.b]; // makes it indexible without implimenting it on Color struct
+        for (i, n) in self.data.iter_mut().enumerate() {
+            let rgb = i % 3; // gives which rgb value is queued
+            if *n > 255 - c[rgb] { *n = 255; } // bounds check
+            else { *n += c[rgb]; }
+        }
 
-        Ok(())
+        Ok(self)
     }
 
-    #[allow(dead_code)]
-    pub fn compress(&mut self) -> std::io::Result<()> {
-        // TODO impliment compression by blending the pixels some thing
-        // for n in self.iter() {
-        //     add_to_buffer(n, n+1, n+width, n+width+1)
-        //     blend(buffer)
-        //     i += 2;
-        // }
-        // maybe double for loop with a 2width and 2pixel gap for 4x4 blending
-
-        Ok(())
+    pub fn convert(&mut self, format: ImgFormat) -> Result<&mut Self, Box<dyn Error>> {
+        if self.format == format { return Err(Box::<dyn Error>::from("Invalid conversion to self")); }
+        self.format = format;
+        
+        Ok(self)
     }
 
-    pub fn write_file(&self, file_name: &str) -> std::io::Result<()> {
-        let mut file = File::create(file_name.to_string() + ".ppm")?;
-        let header = self.header.fmt()?;
+    pub fn write_file(&self, file_name: &str) -> Result<(), Box<dyn Error>> {
+        let extension = match &self.format {
+            ImgFormat::Ppm => ".ppm",
+            ImgFormat::Qoi => ".qoi",
+            _ => return Err(Box::<dyn Error>::from("Invalid format")),
+        };
+        let mut file = File::create(file_name.to_string() + extension)?;
 
-        file.write(header.as_bytes())?;
-        file.write(&self.data.read().unwrap())?;
+        file.write(self.header.contents.as_bytes())?;
+        file.write(&self.data)?;
 
         Ok(())
     }

@@ -1,11 +1,13 @@
-mod image;
-use image::{Image, Color};
+use compression::image::{Image, ImgFormat};
 
-fn main() -> std::io::Result<()> {
+fn main() {
 
-        let mut image = Image::new("./src_images/big_tree.ppm").expect("Image build failed");
-        image.color_shift(Color::new(0, 100, 50))?;
-        image.write_file("/home/jon/Pictures/test_tree")?;
-
-    Ok(())
+    let image = match Image::new(ImgFormat::Qoi, "./src_images/qoi/dice.qoi") {
+        Ok(success) => success,
+        Err(e) => return eprintln!("{e}"),
+    };
+    match image.write_file("/home/jon/Pictures/test_building") {
+        Err(e) => return eprintln!("{e}"), _ => ()
+    }
+    //println!("{:?}", image);
 }
