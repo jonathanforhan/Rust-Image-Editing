@@ -20,8 +20,8 @@ pub fn qoi_header(mut file: &File) -> Result<Header, Box<dyn Error>> {
     reader.read_exact(&mut header_buf)?; // read the 14 bytes qoi header_buf
     file.seek(std::io::SeekFrom::Start(14))?; // reset position after use
 
-    let width = bytes_to_u32(&header_buf[4..8]);
-    let height = bytes_to_u32(&header_buf[8..12]);
+    let width = bytes_to_u32(&header_buf[4..8]) as usize;
+    let height = bytes_to_u32(&header_buf[8..12]) as usize;
 
     // new header on file write
     let mut header = Header::new();
@@ -32,12 +32,12 @@ pub fn qoi_header(mut file: &File) -> Result<Header, Box<dyn Error>> {
     header.channels = match &header_buf[12] {
         3 => String::from("RGB"),
         4 => String::from("RGBA"),
-        _ => process::exit(1),
+        _ => process::exit(1), // TODO better error handling
     };
     header.colorspace = match &header_buf[13] {
         0 => String::from("sRGB with linear alpha"),
         1 => String::from("all channels linear"),
-        _ => process::exit(1),
+        _ => process::exit(1), // TODO
     };
     header.size = 14; // qoi always has 14 bytes headers
 

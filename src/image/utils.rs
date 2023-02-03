@@ -23,8 +23,8 @@ pub enum VidFormat {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Header {
     pub contents: String,   // all formats
-    pub width: u32,         // all formats
-    pub height: u32,        // all formats
+    pub width: usize,         // all formats
+    pub height: usize,        // all formats
     pub format: String,     // all formats
     pub encoding: String,   // ppm
     pub channels: String,   //     qoi

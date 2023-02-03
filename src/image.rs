@@ -2,7 +2,7 @@ mod ppm;
 mod qoi;
 mod utils;
 pub use utils::{ImgFormat, Color, Header};
-use crate::image::qoi::qoi_to_ppm;
+use crate::image::qoi::qoi_to_raw;
 
 use std::{
     fs::File,
@@ -28,9 +28,9 @@ impl Image {
 
         match format {
             ImgFormat::Ppm => (),
-            ImgFormat::Qoi => { qoi_to_ppm(&mut header, &mut data)?; () },
-            ImgFormat::Png => { return Err(Box::<dyn Error>::from("Unsupported format")); },
-            ImgFormat::Jpg => { return Err(Box::<dyn Error>::from("Unsupported format")); },
+            ImgFormat::Qoi => { data = qoi_to_raw(&mut header, data)?; () },
+            ImgFormat::Png => { return Err(Box::<dyn Error>::from("Unsupported format")); }, // TODO
+            ImgFormat::Jpg => { return Err(Box::<dyn Error>::from("Unsupported format")); }, // TODO
         }
 
         Ok(Image { header, data, format })
@@ -41,9 +41,16 @@ impl Image {
         let min = color.clone().into_iter().min().unwrap();
         let color = color.into_iter().map(|x| x - min).collect::<Color>();
 
+        let step = match &self.header.channels[..] {
+            "RGB" => 3,
+            "RGBA" => 4,
+            _ => { return Err(Box::<dyn Error>::from("Unsupported color channels")); },
+        };
+
         let c = [color.r, color.g, color.b]; // makes it indexible without implimenting it on Color struct
         for (i, n) in self.data.iter_mut().enumerate() {
-            let rgb = i % 3; // gives which rgb value is queued
+            let rgb = i % step; // gives which rgb value is queued
+            if rgb == 3 { continue; } // alpha value
             if *n > 255 - c[rgb] { *n = 255; } // bounds check
             else { *n += c[rgb]; }
         }
@@ -58,10 +65,13 @@ impl Image {
         Ok(self)
     }
 
-    pub fn write_file(&self, file_name: &str) -> Result<(), Box<dyn Error>> {
+    pub fn write_file(&mut self, file_name: &str) -> Result<(), Box<dyn Error>> {
         let extension = match &self.format {
-            ImgFormat::Ppm => ".ppm",
-            ImgFormat::Qoi => ".qoi",
+            ImgFormat::Ppm => {
+                self.data = ppm::raw_to_ppm(&mut self.header, &mut self.data).unwrap();
+                ".ppm"
+            },
+            ImgFormat::Qoi => ".qoi", // raw_to_qoi();
             _ => return Err(Box::<dyn Error>::from("Invalid format")),
         };
         let mut file = File::create(file_name.to_string() + extension)?;
