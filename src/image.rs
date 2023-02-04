@@ -19,7 +19,14 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(format: ImgFormat, path: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
+        let format = match &path[path.len()-4..] {
+            ".ppm" => ImgFormat::Ppm,
+            ".qoi" => ImgFormat::Qoi,
+            ".png" => ImgFormat::Png,
+            ".jpg" | ".jpeg" => ImgFormat::Jpg,
+            _ => { return Err(Box::<dyn Error>::from("Unsupported file extension")); },
+        };
         let mut file = File::open(path)?;
         let mut header = Header::from(&format, &file)?;
         let mut data: Vec<u8> = Vec::new();

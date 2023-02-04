@@ -41,5 +41,6 @@ pub fn ppm_header(mut file: &File) -> Result<Header, Box<dyn Error>> {
                       &header.width.to_string() + " " +
                       &header.height.to_string() + "\n" +
                       &header.encoding.to_string() + "\n";
+    header.channels=String::from("RGB");
     Ok(header)
 }

@@ -1,17 +1,10 @@
-use compression::image::{Image, ImgFormat};
+use std::error::Error;
 
-fn main() {
+use image_edit::image::{Image, ImgFormat};
 
-//    let mut image = match Image::new(ImgFormat::Qoi, "./src_images/qoi/kodim23.qoi") {
-//        Ok(success) => success,
-//        Err(e) => return eprintln!("{e}"),
-//    };
-    let mut image = match Image::new(ImgFormat::Qoi, "./src_images/qoi/dice.qoi") {
-        Ok(success) => success,
-        Err(e) => return eprintln!("{e}"),
-    };
-    image.convert(ImgFormat::Ppm).expect("Conversion failed");
-    match image.write_file("/home/jon/Pictures/testcard") {
-        Err(e) => return eprintln!("{e}"), _ => ()
-    }
+fn main() -> Result<(), Box<dyn Error>> {
+
+    let mut image = Image::new("./src_images/qoi/testcard.qoi")?;
+    image.convert(ImgFormat::Ppm)?.color_shift((0, 0, 100))?.write_file("/home/jon/Pictures/testcard")?;
+    Ok(())
 }
